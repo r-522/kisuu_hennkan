@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>基数変換クイズ</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #eef2f7;
+      color: #1e293b;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1d4ed8;
+      color: #fff;
+      text-align: center;
+      padding: 1.1rem 1rem;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    main {
+      max-width: 640px;
+      margin: 1.5rem auto;
+      padding: 0 1rem 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    /* ── Score board ── */
+    .score-board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      background: #fff;
+      border-radius: 12px;
+      padding: 1rem 0.75rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    .score-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .score-label {
+      font-size: 0.65rem;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+
+    .score-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Question card ── */
+    .question-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .question-label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    #question-text {
+      font-size: 1.45rem;
+      font-weight: 600;
+      line-height: 1.6;
+      min-height: 2.4rem;
+    }
+
+    /* ── Choices ── */
+    #choices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      background: #fff;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      min-height: 3.5rem;
+      transition: border-color 0.12s, background 0.12s;
+      width: 100%;
+    }
+
+    .choice-btn:hover:not(:disabled) {
+      border-color: #1d4ed8;
+      background: #eff6ff;
+    }
+
+    .choice-btn:focus-visible {
+      outline: 3px solid #1d4ed8;
+      outline-offset: 2px;
+    }
+
+    .choice-label-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      min-width: 2rem;
+      background: #e2e8f0;
+      border-radius: 50%;
+      font-size: 0.95rem;
+      font-weight: 700;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .choice-btn:hover:not(:disabled) .choice-label-badge {
+      background: #bfdbfe;
+    }
+
+    .choice-btn.correct {
+      border-color: #16a34a;
+      background: #f0fdf4;
+    }
+
+    .choice-btn.correct .choice-label-badge {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    .choice-btn.incorrect {
+      border-color: #dc2626;
+      background: #fef2f2;
+    }
+
+    .choice-btn.incorrect .choice-label-badge {
+      background: #dc2626;
+      color: #fff;
+    }
+
+    .choice-btn:disabled { cursor: default; }
+
+    /* ── Result ── */
+    #result {
+      font-size: 1.2rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 0.7rem 1rem;
+      border-radius: 10px;
+      border: 2px solid transparent;
+      min-height: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #result:empty { display: none; }
+
+    .result-correct {
+      background: #f0fdf4;
+      color: #15803d;
+      border-color: #86efac;
+    }
+
+    .result-incorrect {
+      background: #fef2f2;
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
+
+    /* ── Explanation ── */
+    #explanation {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      line-height: 1.75;
+    }
+
+    #explanation:empty { display: none; }
+
+    .answer-summary {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: #f1f5f9;
+      border-radius: 6px;
+      border-left: 4px solid #1d4ed8;
+    }
+
+    #explanation h3 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #1d4ed8;
+      margin: 1rem 0 0.5rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 2px solid #dbeafe;
+    }
+
+    #explanation h3:first-of-type { margin-top: 0.5rem; }
+
+    #explanation p {
+      font-size: 0.92rem;
+      margin: 0.4rem 0;
+    }
+
+    .calc-steps {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.88rem;
+      margin-top: 0.4rem;
+    }
+
+    .calc-row {
+      padding: 0.18rem 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .calc-row:last-child { border-bottom: none; }
+
+    .calc-row.total {
+      font-weight: 700;
+      color: #1d4ed8;
+      padding-top: 0.4rem;
+      margin-top: 0.2rem;
+      border-top: 2px solid #bfdbfe;
+      border-bottom: none;
+    }
+
+    /* ── Action buttons ── */
+    .action-buttons {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 3rem;
+      transition: opacity 0.12s, transform 0.08s;
+    }
+
+    .btn:focus-visible {
+      outline: 3px solid #1d4ed8;
+      outline-offset: 2px;
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-next {
+      background: #1d4ed8;
+      color: #fff;
+      flex: 1;
+    }
+
+    .btn-next:hover { opacity: 0.88; }
+
+    .btn-reset {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .btn-reset:hover { background: #cbd5e1; }
+
+    /* ── Responsive ── */
+    @media (max-width: 400px) {
+      .score-label { font-size: 0.58rem; }
+      .score-value { font-size: 1.25rem; }
+      #question-text { font-size: 1.2rem; }
+      #choices { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>基数変換クイズ</h1>
+  </header>
+
+  <main>
+    <section class="score-board" aria-label="スコア">
+      <div class="score-item">
+        <span class="score-label">正解数</span>
+        <span id="score-correct" class="score-value">0</span>
+      </div>
+      <div class="score-item">
+        <span class="score-label">回答数</span>
+        <span id="score-total" class="score-value">0</span>
+      </div>
+      <div class="score-item">
+        <span class="score-label">正答率</span>
+        <span id="score-rate" class="score-value">0%</span>
+      </div>
+      <div class="score-item">
+        <span class="score-label">連続正解</span>
+        <span id="score-streak" class="score-value">0</span>
+      </div>
+    </section>
+
+    <section class="question-card" aria-label="問題">
+      <p class="question-label">問題</p>
+      <p id="question-text" aria-live="polite"></p>
+    </section>
+
+    <div id="choices" role="group" aria-label="選択肢"></div>
+
+    <div id="result" role="status" aria-live="assertive"></div>
+
+    <div id="explanation" aria-label="解説"></div>
+
+    <div class="action-buttons">
+      <button id="next-btn" class="btn btn-next" hidden>次の問題 →</button>
+      <button id="reset-btn" class="btn btn-reset">リセット</button>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
