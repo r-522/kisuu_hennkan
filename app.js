@@ -1,9 +1,9 @@
 'use strict';
 
 const BASES      = [2, 8, 10, 16];
-const BASE_NAMES = { 2: '2進数', 8: '8進数', 10: '10進数', 16: '16進数' };
+const BASE_NAMES = { 2: '(2進数)', 8: '(8進数)', 10: '(10進数)', 16: '(16進数)' };
 const LABELS     = ['ア', 'イ', 'ウ', 'エ'];
-const SUB        = { 2: '₂', 8: '₈', 10: '₁₀', 16: '₁₆' };
+const SUB        = { 2: '(2)', 8: '(8)', 10: '(10)', 16: '(16)' };
 
 const state = {
   question: null,
@@ -35,8 +35,28 @@ function init() {
 // ─── Utilities ────────────────────────────────────────────────
 
 function toBaseString(value, base) {
-  if (value <= 0) return '0';
+  if (value === 0) return '0';
   return value.toString(base).toUpperCase();
+}
+
+// Convert intPart + numerator/denominator to a base string with decimal point.
+// denominator must be a power of 2.
+function toFracBaseString(intPart, numerator, denominator, base) {
+  const intStr = toBaseString(intPart, base);
+  if (numerator === 0) return intStr;
+
+  let num     = numerator;
+  const den   = denominator;
+  let fracStr = '';
+
+  while (num > 0 && fracStr.length < 8) {
+    num          *= base;
+    const digit   = Math.floor(num / den);
+    fracStr      += toBaseString(digit, base);
+    num           = num % den;
+  }
+
+  return intStr + '.' + fracStr;
 }
 
 function shuffle(array) {
@@ -51,33 +71,60 @@ function shuffle(array) {
 function toSuperscript(n) {
   const map = {
     '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻'
   };
   return String(n).split('').map(c => map[c] || c).join('');
+}
+
+// Remove floating-point noise while preserving meaningful decimals.
+function trimDecimal(n) {
+  return parseFloat(n.toFixed(10)).toString();
 }
 
 // ─── Question generation ──────────────────────────────────────
 
 function generateQuestion() {
-  const value   = Math.floor(Math.random() * 4095) + 1;
+  return Math.random() < 0.4
+    ? generateFractionalQuestion()
+    : generateIntegerQuestion();
+}
+
+function pickBases() {
   const fromIdx = Math.floor(Math.random() * BASES.length);
   let toIdx;
   do { toIdx = Math.floor(Math.random() * BASES.length); } while (toIdx === fromIdx);
+  return [BASES[fromIdx], BASES[toIdx]];
+}
 
-  const fromBase      = BASES[fromIdx];
-  const toBase        = BASES[toIdx];
-  const fromStr       = toBaseString(value, fromBase);
-  const correctAnswer = toBaseString(value, toBase);
-  const choices       = generateChoices(value, toBase, fromStr);
+function generateIntegerQuestion() {
+  const value           = Math.floor(Math.random() * 4095) + 1;
+  const [fromBase, toBase] = pickBases();
+  const fromStr         = toBaseString(value, fromBase);
+  const correctAnswer   = toBaseString(value, toBase);
+  const choices         = generateIntChoices(value, toBase, fromStr);
 
-  return { value, fromBase, toBase, fromStr, correctAnswer, choices };
+  return { type: 'integer', value, fromBase, toBase, fromStr, correctAnswer, choices };
+}
+
+function generateFractionalQuestion() {
+  const bits            = Math.floor(Math.random() * 4) + 1;   // 1–4 fractional bits
+  const denominator     = Math.pow(2, bits);
+  const numerator       = Math.floor(Math.random() * (denominator - 1)) + 1;
+  const intPart         = Math.floor(Math.random() * 16);      // 0–15
+  const [fromBase, toBase] = pickBases();
+  const fromStr         = toFracBaseString(intPart, numerator, denominator, fromBase);
+  const correctAnswer   = toFracBaseString(intPart, numerator, denominator, toBase);
+  const choices         = generateFracChoices(intPart, numerator, denominator, toBase, correctAnswer);
+
+  return { type: 'fractional', intPart, numerator, denominator,
+           fromBase, toBase, fromStr, correctAnswer, choices };
 }
 
 // ─── Choice generation ────────────────────────────────────────
 
-function generateChoices(correctValue, targetBase, sourceStr) {
+function generateIntChoices(correctValue, targetBase, sourceStr) {
   const correctStr = toBaseString(correctValue, targetBase);
-  const seen = new Set([correctStr]);
+  const seen       = new Set([correctStr]);
 
   function tryAdd(v) {
     if (seen.size >= 4) return;
@@ -90,26 +137,58 @@ function generateChoices(correctValue, targetBase, sourceStr) {
   tryAdd(correctValue + targetBase);
   tryAdd(correctValue - targetBase);
 
-  // Common mistake: read source digits as if they were decimal
-  const asDecimal = parseInt(sourceStr, 10);
-  if (!isNaN(asDecimal)) tryAdd(asDecimal);
+  // "ソースをそのまま10進数として読む" ミスは、ソースが純粋な数字のときだけ有効
+  if (/^\d+$/.test(sourceStr)) {
+    const asDecimal = parseInt(sourceStr, 10);
+    if (Number.isFinite(asDecimal)) tryAdd(asDecimal);
+  }
 
   tryAdd(correctValue + 2);
   tryAdd(correctValue - 2);
   tryAdd(correctValue + targetBase * 2);
   tryAdd(correctValue - targetBase * 2);
 
-  // Fallback: widen search
   for (let offset = 3; seen.size < 4 && offset < 100000; offset++) {
     tryAdd(correctValue + offset);
     tryAdd(correctValue - offset);
   }
 
-  const shuffled = shuffle([...seen].slice(0, 4));
-  return shuffled.map((val, i) => ({
-    label: LABELS[i],
-    value: val,
-    isCorrect: val === correctStr
+  return shuffle([...seen].slice(0, 4)).map((val, i) => ({
+    label: LABELS[i], value: val, isCorrect: val === correctStr
+  }));
+}
+
+function generateFracChoices(intPart, numerator, denominator, toBase, correctStr) {
+  const seen = new Set([correctStr]);
+
+  function tryFrac(ip, n, d) {
+    if (seen.size >= 4) return;
+    if (ip < 0 || n <= 0 || n >= d) return;
+    const s = toFracBaseString(ip, n, d, toBase);
+    if (!seen.has(s)) seen.add(s);
+  }
+
+  // 同じ分母で分子を変える
+  for (let n = 1; n < denominator && seen.size < 4; n++) {
+    if (n !== numerator) tryFrac(intPart, n, denominator);
+  }
+
+  // 整数部分を変える
+  tryFrac(intPart + 1, numerator, denominator);
+  if (intPart > 0) tryFrac(intPart - 1, numerator, denominator);
+
+  // 分母を2倍にした近傍値
+  tryFrac(intPart, numerator * 2 - 1, denominator * 2);
+  tryFrac(intPart, numerator * 2 + 1, denominator * 2);
+
+  // フォールバック
+  for (let extra = 2; seen.size < 4 && extra < 50; extra++) {
+    const s = toFracBaseString(intPart + extra, numerator, denominator, toBase);
+    if (!seen.has(s)) seen.add(s);
+  }
+
+  return shuffle([...seen].slice(0, 4)).map((val, i) => ({
+    label: LABELS[i], value: val, isCorrect: val === correctStr
   }));
 }
 
@@ -128,9 +207,9 @@ function renderQuestion() {
   el.choices.innerHTML = '';
   q.choices.forEach(choice => {
     const btn = document.createElement('button');
-    btn.className = 'choice-btn';
-    btn.dataset.correct = String(choice.isCorrect);
-    btn.dataset.value   = choice.value;
+    btn.className          = 'choice-btn';
+    btn.dataset.correct    = String(choice.isCorrect);
+    btn.dataset.value      = choice.value;
     btn.innerHTML =
       `<span class="choice-label-badge">${choice.label}</span>` +
       `<span class="choice-value">${choice.value}</span>`;
@@ -149,11 +228,8 @@ function renderQuestion() {
 function handleAnswer(choice) {
   el.choices.querySelectorAll('.choice-btn').forEach(btn => {
     btn.disabled = true;
-    if (btn.dataset.correct === 'true') {
-      btn.classList.add('correct');
-    } else if (btn.dataset.value === choice.value) {
-      btn.classList.add('incorrect');
-    }
+    if (btn.dataset.correct === 'true')        btn.classList.add('correct');
+    else if (btn.dataset.value === choice.value) btn.classList.add('incorrect');
   });
 
   const isCorrect = choice.isCorrect;
@@ -172,12 +248,9 @@ function showResult(isCorrect) {
 
 function updateScore(isCorrect) {
   state.score.total++;
-  if (isCorrect) {
-    state.score.correct++;
-    state.score.streak++;
-  } else {
-    state.score.streak = 0;
-  }
+  if (isCorrect) { state.score.correct++; state.score.streak++; }
+  else           { state.score.streak = 0; }
+
   el.scoreCorrect.textContent = state.score.correct;
   el.scoreTotal.textContent   = state.score.total;
   el.scoreRate.textContent    =
@@ -194,58 +267,161 @@ function resetQuiz() {
   nextQuestion();
 }
 
-// ─── Explanation ──────────────────────────────────────────────
+// ─── Explanation dispatcher ───────────────────────────────────
 
 function buildExplanation(q) {
+  return q.type === 'fractional'
+    ? buildFractionalExplanation(q)
+    : buildIntegerExplanation(q);
+}
+
+// ─── Integer explanation ──────────────────────────────────────
+
+function buildIntegerExplanation(q) {
   const { value, fromBase, toBase, fromStr, correctAnswer } = q;
   let html =
     `<p class="answer-summary">正解：<strong>${correctAnswer}</strong>（${BASE_NAMES[toBase]}）</p>`;
 
   if (fromBase === 10) {
-    // Already decimal → convert to target
-    html += `<h3>${BASE_NAMES[fromBase]} → ${BASE_NAMES[toBase]}への変換</h3>`;
-    html += `<p>問題の値はすでに10進数です。</p>`;
+    html += `<h3>${BASE_NAMES[fromBase]} → ${BASE_NAMES[toBase]} への変換</h3>`;
+    html += `<p>問題の値はすでに${BASE_NAMES[10]}です。</p>`;
     html += buildFromDecimalSteps(value, toBase, correctAnswer);
   } else if (toBase === 10) {
-    // Source → decimal = answer
-    html += `<h3>${BASE_NAMES[fromBase]} → 10進数への展開</h3>`;
+    html += `<h3>${BASE_NAMES[fromBase]} → ${BASE_NAMES[10]} への展開</h3>`;
     html += buildToDecimalSteps(fromStr, fromBase, value);
     html += `<p>各桁を展開して合計した値が答えです。</p>`;
   } else {
-    // Two-step: source → decimal → target
-    html += `<h3>Step 1：${BASE_NAMES[fromBase]} → 10進数</h3>`;
+    html += `<h3>Step 1：${BASE_NAMES[fromBase]} → ${BASE_NAMES[10]}</h3>`;
     html += buildToDecimalSteps(fromStr, fromBase, value);
-    html += `<h3>Step 2：10進数 → ${BASE_NAMES[toBase]}</h3>`;
+    html += `<h3>Step 2：${BASE_NAMES[10]} → ${BASE_NAMES[toBase]}</h3>`;
     html += buildFromDecimalSteps(value, toBase, correctAnswer);
   }
 
   const alt = buildAlternativeExplanation(q);
-  if (alt) {
-    html += `<h3>別解：グルーピング法</h3>` + alt;
+  if (alt) html += `<h3>別解：グルーピング法</h3>` + alt;
+
+  return html;
+}
+
+// ─── Fractional explanation ───────────────────────────────────
+
+function buildFractionalExplanation(q) {
+  const { intPart, numerator, denominator, fromBase, toBase, fromStr, correctAnswer } = q;
+  let html =
+    `<p class="answer-summary">正解：<strong>${correctAnswer}</strong>（${BASE_NAMES[toBase]}）</p>`;
+
+  if (fromBase === 10) {
+    html += `<h3>${BASE_NAMES[fromBase]} → ${BASE_NAMES[toBase]} への変換</h3>`;
+    html += `<p>整数部分と小数部分を分けて変換します。</p>`;
+    if (intPart > 0) {
+      html += `<p><strong>整数部分：</strong></p>`;
+      html += buildFromDecimalSteps(intPart, toBase, toBaseString(intPart, toBase));
+    }
+    html += `<p><strong>小数部分（繰り返し乗算法）：</strong></p>`;
+    html += buildFracFromDecimalSteps(numerator, denominator, toBase);
+
+  } else if (toBase === 10) {
+    html += `<h3>${BASE_NAMES[fromBase]} → ${BASE_NAMES[10]} への展開</h3>`;
+    html += buildFracToDecimalSteps(fromStr, fromBase, intPart, numerator, denominator);
+
+  } else {
+    html += `<h3>Step 1：${BASE_NAMES[fromBase]} → ${BASE_NAMES[10]}</h3>`;
+    html += buildFracToDecimalSteps(fromStr, fromBase, intPart, numerator, denominator);
+    html += `<h3>Step 2：${BASE_NAMES[10]} → ${BASE_NAMES[toBase]}</h3>`;
+    html += `<p>整数部分と小数部分を分けて変換します。</p>`;
+    if (intPart > 0) {
+      html += `<p><strong>整数部分：</strong></p>`;
+      html += buildFromDecimalSteps(intPart, toBase, toBaseString(intPart, toBase));
+    }
+    html += `<p><strong>小数部分（繰り返し乗算法）：</strong></p>`;
+    html += buildFracFromDecimalSteps(numerator, denominator, toBase);
+    html += `<p>合わせると：<strong>${correctAnswer}</strong>（${BASE_NAMES[toBase]}）</p>`;
   }
 
   return html;
 }
 
-// Expand digits of `str` (in `base`) into decimal terms
+// 小数を含む数を source base から10進数へ展開する手順を生成する
+function buildFracToDecimalSteps(fromStr, fromBase, intPart, numerator, denominator) {
+  const parts   = fromStr.split('.');
+  const intStr  = parts[0];
+  const fracStr = parts[1] || '';
+  let html      = '';
+
+  if (intPart > 0) {
+    html += `<p><strong>整数部分の展開：</strong></p>`;
+    html += buildToDecimalSteps(intStr, fromBase, intPart);
+  }
+
+  html += `<p><strong>小数部分の展開：</strong></p>`;
+  html += '<div class="calc-steps">';
+
+  fracStr.split('').forEach((d, i) => {
+    const dVal    = parseInt(d, 16);          // parseInt base16 はすべての桁文字に有効
+    const expNum  = -(i + 1);
+    const termVal = dVal / Math.pow(fromBase, i + 1);
+    let dDisplay  = d;
+    if (fromBase === 16 && dVal >= 10) dDisplay = `${d}(=${dVal})`;
+    html += `<div class="calc-row">${dDisplay} × ${fromBase}${toSuperscript(expNum)} = ${trimDecimal(termVal)}</div>`;
+  });
+
+  const fracDecimal = numerator / denominator;
+  html += `<div class="calc-row total">小数部分の合計 = ${trimDecimal(fracDecimal)}</div>`;
+  html += '</div>';
+
+  if (intPart > 0) {
+    html += `<p>整数部分 ${intPart} ＋ 小数部分 ${trimDecimal(fracDecimal)} = ` +
+            `<strong>${trimDecimal(intPart + fracDecimal)}</strong></p>`;
+  }
+
+  return html;
+}
+
+// 小数部分（numerator/denominator）を target base へ繰り返し乗算法で変換する手順を生成する
+function buildFracFromDecimalSteps(numerator, denominator, base) {
+  let html = '<div class="calc-steps">';
+  let num  = numerator;
+  const den           = denominator;
+  const resultDigits  = [];
+
+  while (num > 0 && resultDigits.length < 8) {
+    const before  = num / den;
+    num          *= base;
+    const digit   = Math.floor(num / den);
+    num           = num % den;
+    const after   = num / den;
+
+    let digitDisplay = toBaseString(digit, base);
+    if (base === 16 && digit >= 10) digitDisplay = `${toBaseString(digit, base)}(=${digit})`;
+
+    resultDigits.push(toBaseString(digit, base));
+
+    const afterStr = num === 0 ? '0' : trimDecimal(after);
+    html += `<div class="calc-row">` +
+            `${trimDecimal(before)} × ${base} = ${trimDecimal(before * base)}` +
+            ` → <strong>${digitDisplay}</strong>、残り ${afterStr}</div>`;
+  }
+
+  html += `<div class="calc-row total">上から読む → <strong>.${resultDigits.join('')}</strong></div>`;
+  html += '</div>';
+  return html;
+}
+
+// ─── 共通ステップビルダー ─────────────────────────────────────
+
+// str (fromBase 表記) を10進数に展開する手順を生成する
 function buildToDecimalSteps(str, base, decimalResult) {
   const digits = str.split('');
   const n      = digits.length;
   let html     = '<div class="calc-steps">';
 
   digits.forEach((d, i) => {
-    const exp    = n - 1 - i;
-    const dVal   = parseInt(d, 16); // hex covers all our digit chars
+    const exp     = n - 1 - i;
+    const dVal    = parseInt(d, 16);   // base16 解釈はすべての対象桁文字に対して正しい値を返す
     const termVal = dVal * Math.pow(base, exp);
-
-    let dDisplay = d;
+    let dDisplay  = d;
     if (base === 16 && dVal >= 10) dDisplay = `${d}(=${dVal})`;
-
-    const expStr = exp === 0 ? `${base}⁰` :
-                   exp === 1 ? `${base}¹` :
-                   `${base}${toSuperscript(exp)}`;
-
-    html += `<div class="calc-row">${dDisplay} × ${expStr} = ${termVal}</div>`;
+    html += `<div class="calc-row">${dDisplay} × ${base}${toSuperscript(exp)} = ${termVal}</div>`;
   });
 
   html += `<div class="calc-row total">合計 = <strong>${decimalResult}</strong></div>`;
@@ -253,18 +429,18 @@ function buildToDecimalSteps(str, base, decimalResult) {
   return html;
 }
 
-// Show repeated division of `value` by `base`
+// 10進整数 value を target base へ繰り返し除算する手順を生成する
 function buildFromDecimalSteps(value, base, result) {
   let html = '<div class="calc-steps">';
-  let n    = value;
+  let rem  = value;
 
-  while (n > 0) {
-    const q    = Math.floor(n / base);
-    const r    = n % base;
-    const rStr = toBaseString(r, base);
+  while (rem > 0) {
+    const q        = Math.floor(rem / base);
+    const r        = rem % base;
+    const rStr     = toBaseString(r, base);
     const rDisplay = (base === 16 && r >= 10) ? `${rStr}(=${r})` : rStr;
-    html += `<div class="calc-row">${n} ÷ ${base} = ${q} … 余り ${rDisplay}</div>`;
-    n = q;
+    html += `<div class="calc-row">${rem} ÷ ${base} = ${q} … 余り ${rDisplay}</div>`;
+    rem = q;
   }
 
   html += `<div class="calc-row total">余りを下から読む → <strong>${result}</strong></div>`;
@@ -272,11 +448,10 @@ function buildFromDecimalSteps(value, base, result) {
   return html;
 }
 
-// ─── Alternative (grouping) explanations ─────────────────────
+// ─── 別解（グルーピング法）── 整数問題のみ ────────────────────
 
 function buildAlternativeExplanation(q) {
   const { fromBase, toBase, fromStr, correctAnswer } = q;
-
   if (fromBase === 2  && toBase === 8)  return binToOctAlt(fromStr, correctAnswer);
   if (fromBase === 8  && toBase === 2)  return octToBinAlt(fromStr, correctAnswer);
   if (fromBase === 2  && toBase === 16) return binToHexAlt(fromStr, correctAnswer);
