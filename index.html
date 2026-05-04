@@ -5,340 +5,358 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>基数変換クイズ</title>
   <style>
+    :root {
+      --bg:        #e8e5de;
+      --paper:     #fafaf6;
+      --border:    #ccc9bc;
+      --text:      #1a1a1a;
+      --muted:     #78756f;
+      --ink:       #3a4f7a;
+      --ink-light: #eaeff8;
+      --correct:      #2e7d5a;
+      --correct-bg:   #ebf6f1;
+      --correct-bd:   #96cbb5;
+      --wrong:        #a82828;
+      --wrong-bg:     #faeaea;
+      --wrong-bd:     #dda0a0;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif;
-      background: #eef2f7;
-      color: #1e293b;
+      font-family: system-ui, -apple-system, 'Helvetica Neue', 'Hiragino Kaku Gothic Pro', Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.6;
     }
 
-    header {
-      background: #1d4ed8;
+    /* ── Header ── */
+    .site-header {
+      background: #1e1e1e;
       color: #fff;
-      text-align: center;
-      padding: 1.1rem 1rem;
-    }
-
-    header h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-    }
-
-    main {
-      max-width: 640px;
-      margin: 1.5rem auto;
-      padding: 0 1rem 3rem;
+      padding: 0.6rem 1.25rem;
       display: flex;
-      flex-direction: column;
-      gap: 1.1rem;
-    }
-
-    /* ── Score board ── */
-    .score-board {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.5rem;
-      background: #fff;
-      border-radius: 12px;
-      padding: 1rem 0.75rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    }
-
-    .score-item {
-      display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 0.2rem;
+      justify-content: space-between;
+      gap: 1rem;
     }
 
-    .score-label {
-      font-size: 0.65rem;
-      color: #64748b;
+    .site-title {
+      font-size: 0.9rem;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.07em;
       white-space: nowrap;
     }
 
-    .score-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #1d4ed8;
-      font-variant-numeric: tabular-nums;
+    .score-bar {
+      display: flex;
+      gap: 1.25rem;
+      font-size: 0.76rem;
+      color: rgba(255, 255, 255, 0.8);
     }
 
-    /* ── Question card ── */
+    .score-item { display: flex; align-items: center; gap: 0.35rem; }
+    .score-label { opacity: 0.6; white-space: nowrap; }
+    .score-value { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .score-streak .score-value { color: #fbbf24; }
+
+    /* ── Layout ── */
+    main {
+      max-width: 540px;
+      margin: 1.75rem auto;
+      padding: 0 1rem 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    /* ── Question ── */
     .question-card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 1.5rem 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      text-align: center;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.4rem 1.4rem 1.2rem;
     }
 
-    .question-label {
-      font-size: 0.75rem;
-      color: #94a3b8;
+    .q-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .q-number {
+      font-size: 0.68rem;
       font-weight: 700;
+      color: #fff;
+      background: var(--ink);
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+    }
+
+    .q-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 0.6rem;
+      letter-spacing: 0.07em;
     }
 
     #question-text {
-      font-size: 1.45rem;
+      font-size: 1.5rem;
       font-weight: 600;
-      line-height: 1.6;
-      min-height: 2.4rem;
+      line-height: 1.5;
+      min-height: 2.3rem;
+    }
+
+    .base-sub {
+      font-size: 0.58em;
+      font-weight: 500;
+      color: var(--muted);
+      letter-spacing: 0;
+      position: relative;
+      top: 0.08em;
     }
 
     /* ── Choices ── */
     #choices {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
     }
 
     .choice-btn {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.85rem 1rem;
-      background: #fff;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      font-size: 1.05rem;
-      font-weight: 500;
+      gap: 0.85rem;
+      padding: 0.75rem 1rem;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.97rem;
       cursor: pointer;
       text-align: left;
-      min-height: 3.5rem;
-      transition: border-color 0.12s, background 0.12s;
       width: 100%;
+      min-height: 2.9rem;
+      transition: border-color 0.1s, background 0.1s;
     }
 
     .choice-btn:hover:not(:disabled) {
-      border-color: #1d4ed8;
-      background: #eff6ff;
+      border-color: var(--ink);
+      background: var(--ink-light);
     }
 
     .choice-btn:focus-visible {
-      outline: 3px solid #1d4ed8;
-      outline-offset: 2px;
+      outline: 2px solid var(--ink);
+      outline-offset: 1px;
     }
 
     .choice-label-badge {
+      width: 1.7rem;
+      height: 1.7rem;
+      min-width: 1.7rem;
+      border: 1.5px solid var(--border);
+      border-radius: 50%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 2rem;
-      height: 2rem;
-      min-width: 2rem;
-      background: #e2e8f0;
-      border-radius: 50%;
-      font-size: 0.95rem;
+      font-size: 0.8rem;
       font-weight: 700;
-      transition: background 0.12s, color 0.12s;
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: all 0.1s;
     }
 
     .choice-btn:hover:not(:disabled) .choice-label-badge {
-      background: #bfdbfe;
+      border-color: var(--ink);
+      color: var(--ink);
     }
 
-    .choice-btn.correct {
-      border-color: #16a34a;
-      background: #f0fdf4;
+    .choice-value {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
     }
 
+    .choice-btn.correct { border-color: var(--correct-bd); background: var(--correct-bg); }
     .choice-btn.correct .choice-label-badge {
-      background: #16a34a;
-      color: #fff;
+      background: var(--correct); border-color: var(--correct); color: #fff;
     }
 
-    .choice-btn.incorrect {
-      border-color: #dc2626;
-      background: #fef2f2;
-    }
-
+    .choice-btn.incorrect { border-color: var(--wrong-bd); background: var(--wrong-bg); }
     .choice-btn.incorrect .choice-label-badge {
-      background: #dc2626;
-      color: #fff;
+      background: var(--wrong); border-color: var(--wrong); color: #fff;
     }
 
     .choice-btn:disabled { cursor: default; }
 
+    /* ── Keyboard hint ── */
+    .kbd-hint {
+      font-size: 0.66rem;
+      color: var(--muted);
+      text-align: right;
+      opacity: 0.7;
+    }
+
     /* ── Result ── */
     #result {
-      font-size: 1.2rem;
+      font-size: 1rem;
       font-weight: 700;
-      text-align: center;
-      padding: 0.7rem 1rem;
-      border-radius: 10px;
-      border: 2px solid transparent;
-      min-height: 3rem;
+      padding: 0.6rem 1rem;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      min-height: 2.65rem;
       display: flex;
       align-items: center;
-      justify-content: center;
     }
 
     #result:empty { display: none; }
 
-    .result-correct {
-      background: #f0fdf4;
-      color: #15803d;
-      border-color: #86efac;
-    }
-
-    .result-incorrect {
-      background: #fef2f2;
-      color: #b91c1c;
-      border-color: #fca5a5;
-    }
+    .result-correct  { background: var(--correct-bg); color: var(--correct); border-color: var(--correct-bd); }
+    .result-incorrect { background: var(--wrong-bg);  color: var(--wrong);   border-color: var(--wrong-bd); }
 
     /* ── Explanation ── */
     #explanation {
-      background: #fff;
-      border-radius: 12px;
-      padding: 1.25rem;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      line-height: 1.75;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1.05rem 1.2rem;
+      line-height: 1.7;
     }
 
     #explanation:empty { display: none; }
 
     .answer-summary {
-      font-size: 1rem;
-      margin-bottom: 0.75rem;
-      padding: 0.5rem 0.75rem;
-      background: #f1f5f9;
-      border-radius: 6px;
-      border-left: 4px solid #1d4ed8;
+      font-size: 0.9rem;
+      padding: 0.38rem 0.7rem;
+      border-left: 3px solid var(--ink);
+      background: var(--ink-light);
+      border-radius: 0 3px 3px 0;
+      margin-bottom: 0.6rem;
     }
 
     #explanation h3 {
-      font-size: 0.88rem;
+      font-size: 0.75rem;
       font-weight: 700;
-      color: #1d4ed8;
-      margin: 1rem 0 0.5rem;
-      padding-bottom: 0.3rem;
-      border-bottom: 2px solid #dbeafe;
+      color: var(--ink);
+      margin: 0.85rem 0 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding-bottom: 0.18rem;
+      border-bottom: 1px solid var(--border);
     }
 
-    #explanation h3:first-of-type { margin-top: 0.5rem; }
+    #explanation h3:first-of-type { margin-top: 0.3rem; }
 
     #explanation p {
-      font-size: 0.92rem;
-      margin: 0.4rem 0;
+      font-size: 0.86rem;
+      margin: 0.28rem 0;
+      color: var(--muted);
     }
 
+    #explanation p strong { color: var(--text); }
+
     .calc-steps {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 0.65rem 1rem;
+      background: #eeebe3;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.5rem 0.8rem;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 0.88rem;
-      margin-top: 0.4rem;
+      font-size: 0.81rem;
+      margin: 0.25rem 0;
     }
 
     .calc-row {
-      padding: 0.18rem 0;
-      border-bottom: 1px solid #f1f5f9;
+      padding: 0.12rem 0;
+      border-bottom: 1px solid #dbd7cd;
     }
 
     .calc-row:last-child { border-bottom: none; }
 
     .calc-row.total {
       font-weight: 700;
-      color: #1d4ed8;
-      padding-top: 0.4rem;
-      margin-top: 0.2rem;
-      border-top: 2px solid #bfdbfe;
+      color: var(--ink);
+      margin-top: 0.15rem;
+      padding-top: 0.25rem;
+      border-top: 1.5px solid var(--border);
       border-bottom: none;
     }
 
-    /* ── Action buttons ── */
-    .action-buttons {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
+    /* ── Actions ── */
+    .action-buttons { display: flex; gap: 0.5rem; }
 
     .btn {
-      padding: 0.8rem 1.5rem;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
+      padding: 0.65rem 1.2rem;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      font-size: 0.9rem;
       font-weight: 600;
       cursor: pointer;
-      min-height: 3rem;
-      transition: opacity 0.12s, transform 0.08s;
+      min-height: 2.6rem;
+      transition: opacity 0.1s;
     }
 
-    .btn:focus-visible {
-      outline: 3px solid #1d4ed8;
-      outline-offset: 2px;
-    }
+    .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .btn:active { opacity: 0.82; }
 
-    .btn:active { transform: scale(0.98); }
-
-    .btn-next {
-      background: #1d4ed8;
-      color: #fff;
-      flex: 1;
-    }
-
+    .btn-next { background: var(--ink); color: #fff; flex: 1; }
     .btn-next:hover { opacity: 0.88; }
 
     .btn-reset {
-      background: #e2e8f0;
-      color: #475569;
+      background: var(--paper);
+      color: var(--muted);
+      border-color: var(--border);
     }
-
-    .btn-reset:hover { background: #cbd5e1; }
+    .btn-reset:hover { background: var(--bg); }
 
     /* ── Responsive ── */
-    @media (max-width: 400px) {
-      .score-label { font-size: 0.58rem; }
-      .score-value { font-size: 1.25rem; }
+    @media (max-width: 420px) {
       #question-text { font-size: 1.2rem; }
-      #choices { grid-template-columns: 1fr; }
+      .score-bar { gap: 0.75rem; font-size: 0.7rem; }
+      .score-item.hide-xs { display: none; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>基数変換クイズ</h1>
-  </header>
 
-  <main>
-    <section class="score-board" aria-label="スコア">
+  <header class="site-header">
+    <h1 class="site-title">基数変換クイズ</h1>
+    <div class="score-bar" aria-label="スコア">
       <div class="score-item">
-        <span class="score-label">正解数</span>
+        <span class="score-label">正解</span>
         <span id="score-correct" class="score-value">0</span>
       </div>
       <div class="score-item">
-        <span class="score-label">回答数</span>
+        <span class="score-label">回答</span>
         <span id="score-total" class="score-value">0</span>
       </div>
-      <div class="score-item">
+      <div class="score-item hide-xs">
         <span class="score-label">正答率</span>
-        <span id="score-rate" class="score-value">0%</span>
+        <span id="score-rate" class="score-value">—</span>
       </div>
-      <div class="score-item">
-        <span class="score-label">連続正解</span>
+      <div class="score-item score-streak">
+        <span class="score-label">連続</span>
         <span id="score-streak" class="score-value">0</span>
       </div>
-    </section>
+    </div>
+  </header>
 
-    <section class="question-card" aria-label="問題">
-      <p class="question-label">問題</p>
+  <main>
+    <div class="question-card">
+      <div class="q-meta">
+        <span id="q-number" class="q-number">Q1</span>
+        <span class="q-label">問題</span>
+      </div>
       <p id="question-text" aria-live="polite"></p>
-    </section>
+    </div>
 
     <div id="choices" role="group" aria-label="選択肢"></div>
+
+    <p class="kbd-hint">キー操作：1 2 3 4 で回答　Enter で次へ</p>
 
     <div id="result" role="status" aria-live="assertive"></div>
 

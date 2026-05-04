@@ -7,7 +7,7 @@ const SUB        = { 2: '(2)', 8: '(8)', 10: '(10)', 16: '(16)' };
 
 const state = {
   question: null,
-  score: { correct: 0, total: 0, streak: 0 }
+  score: { correct: 0, total: 0, streak: 0, qNumber: 0 }
 };
 
 const el = {};
@@ -26,10 +26,29 @@ function init() {
   el.scoreRate    = document.getElementById('score-rate');
   el.scoreStreak  = document.getElementById('score-streak');
 
+  el.qNumber = document.getElementById('q-number');
+
   el.nextBtn.addEventListener('click', nextQuestion);
   el.resetBtn.addEventListener('click', resetQuiz);
 
+  document.addEventListener('keydown', handleKey);
+
   nextQuestion();
+}
+
+function handleKey(e) {
+  // 1–4 で選択肢を選ぶ
+  const idx = ['1','2','3','4'].indexOf(e.key);
+  if (idx !== -1) {
+    const btns = el.choices.querySelectorAll('.choice-btn:not(:disabled)');
+    if (btns[idx]) btns[idx].click();
+    return;
+  }
+  // Enter / Space で次の問題へ
+  if ((e.key === 'Enter' || e.key === ' ') && !el.nextBtn.hidden) {
+    e.preventDefault();
+    nextQuestion();
+  }
 }
 
 // ─── Utilities ────────────────────────────────────────────────
@@ -81,6 +100,10 @@ function trimDecimal(n) {
   return parseFloat(n.toFixed(10)).toString();
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // ─── Question generation ──────────────────────────────────────
 
 function generateQuestion() {
@@ -97,7 +120,7 @@ function pickBases() {
 }
 
 function generateIntegerQuestion() {
-  const value           = Math.floor(Math.random() * 4095) + 1;
+  const value           = Math.floor(Math.random() * 255) + 1;
   const [fromBase, toBase] = pickBases();
   const fromStr         = toBaseString(value, fromBase);
   const correctAnswer   = toBaseString(value, toBase);
@@ -201,8 +224,14 @@ function nextQuestion() {
 
 function renderQuestion() {
   const q = state.question;
-  el.questionText.textContent =
-    `${q.fromStr}${SUB[q.fromBase]} を ${BASE_NAMES[q.toBase]} に変換してください。`;
+
+  state.score.qNumber++;
+  el.qNumber.textContent = `Q${state.score.qNumber}`;
+
+  el.questionText.innerHTML =
+    `<span class="from-val">${escapeHtml(q.fromStr)}</span>` +
+    `<span class="base-sub">${SUB[q.fromBase]}</span>` +
+    ` を ${escapeHtml(BASE_NAMES[q.toBase])} に変換してください。`;
 
   el.choices.innerHTML = '';
   q.choices.forEach(choice => {
@@ -253,16 +282,15 @@ function updateScore(isCorrect) {
 
   el.scoreCorrect.textContent = state.score.correct;
   el.scoreTotal.textContent   = state.score.total;
-  el.scoreRate.textContent    =
-    Math.round(state.score.correct / state.score.total * 100) + '%';
+  el.scoreRate.textContent    = Math.round(state.score.correct / state.score.total * 100) + '%';
   el.scoreStreak.textContent  = state.score.streak;
 }
 
 function resetQuiz() {
-  state.score = { correct: 0, total: 0, streak: 0 };
+  state.score = { correct: 0, total: 0, streak: 0, qNumber: 0 };
   el.scoreCorrect.textContent = '0';
   el.scoreTotal.textContent   = '0';
-  el.scoreRate.textContent    = '0%';
+  el.scoreRate.textContent    = '—';
   el.scoreStreak.textContent  = '0';
   nextQuestion();
 }
